@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Sign Language Translator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            margin-bottom: 15px;
+        }
+
+        .feature-badges {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr 300px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .mode-selector {
+            display: flex;
+            background: rgba(0,0,0,0.2);
+            border-radius: 25px;
+            padding: 4px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .mode-btn.active {
+            background: rgba(255,255,255,0.3);
+            font-weight: 600;
+        }
+
+        .video-container {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+
+        #videoElement {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        #canvasElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn-start {
+            background: linear-gradient(45deg, #2ecc71, #27ae60);
+        }
+
+        .btn-stop {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            text-align: center;
+            font-weight: 600;
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .status.status-active {
+            background: rgba(46, 204, 113, 0.3);
+            color: #2ecc71;
+        }
+
+        .status.status-inactive {
+            background: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+        }
+
+        .detection-area {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .detected-gesture {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gesture-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .gesture-type {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .gesture-description {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .confidence-section {
+            margin-top: 15px;
+        }
+
+        .confidence-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .sentence-builder {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sentence-builder h3 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .sentence-display {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 60px;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            word-break: break-all;
+        }
+
+        .sentence-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-mini {
+            padding: 8px 12px;
+            font-size: 0.8rem;
+        }
+
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .reference-section {
+            grid-column: span 3;
+            margin-top: 20px;
+        }
+
+        .reference-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ref-tab {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .ref-tab.active {
+            background: rgba(255,255,255,0.4);
+            font-weight: 600;
+        }
+
+        .reference-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 15px;
+        }
+
+        .reference-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .reference-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .reference-char {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+
+        .reference-desc {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .history-section {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .history-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: rgba(255,255,255,0.1);
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .no-history {
+            text-align: center;
+            opacity: 0.6;
+            padding: 20px;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .detected-gesture.active {
+            animation: pulse 1s ease-in-out;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .history-section {
+                grid-column: span 2;
+            }
+            
+            .reference-section {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .reference-section,
+            .history-section {
+                grid-column: span 1;
+            }
+            
+            .gesture-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤟 Enhanced Sign Language Translator</h1>
+            <p>Real-time ASL Alphabet & Number Recognition</p>
+            <div class="feature-badges">
+                <span class="badge">A-Z Letters</span>
+                <span class="badge">0-9 Numbers</span>
+                <span class="badge">Real-time Detection</span>
+                <span class="badge">Sentence Builder</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="section">
+                <div class="section-header">
+                    <h2>📹 Camera Feed</h2>
+                    <div class="mode-selector">
+                        <button id="alphabetMode" class="mode-btn active">Alphabet</button>
+                        <button id="numberMode" class="mode-btn">Numbers</button>
+                        <button id="allMode" class="mode-btn">All</button>
+                    </div>
+                </div>
+                
+                <div class="video-container">
+                    <video id="videoElement" autoplay muted playsinline></video>
+                    <canvas id="canvasElement"></canvas>
+                </div>
+                
+                <div class="camera-controls">
+                    <button id="startBtn" class="btn btn-start">
+                        ▶️ Start Camera
+                    </button>
+                    <button id="stopBtn" class="btn btn-stop" disabled>
+                        ⏹️ Stop Camera
+                    </button>
+                </div>
+
+                <div id="cameraStatus" class="status status-inactive">
+                    📷 Camera Inactive
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2>🔤 Translation Output</h2>
+                    <button id="clearBtn" class="btn btn-secondary btn-mini">Clear</button>
+                </div>
+                
+                <div class="detection-area">
+                    <div class="detected-gesture" id="detectedGesture">
+                        Ready...
+                    </div>
+                    
+                    <div class="gesture-info">
+                        <div class="gesture-type" id="gestureType">Type: -</div>
+                        <div class="gesture-description" id="gestureDescription">
+                            Show your hand to camera
+                        </div>
+                    </div>
+                    
+                    <div class="confidence-section">
+                        <div class="confidence-label">
+                            <span>Confidence Level</span>
+                            <span id="confidenceValue">0%</span>
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sentence-builder">
+                    <h3>📝 Sentence Builder</h3>
+                    <div class="sentence-display" id="sentenceDisplay">
+                        Letters and numbers will appear here...
+                    </div>
+                    <div class="sentence-controls">
+                        <button id="addSpaceBtn" class="btn btn-mini btn-secondary">Space</button>
+                        <button id="deleteLastBtn" class="btn btn-mini btn-secondary">Delete</button>
+                        <button id="clearSentenceBtn" class="btn btn-mini btn-secondary">Clear</button>
+                        <button id="speakBtn" class="btn btn-mini btn-secondary">🔊 Speak</button>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalDetected">0</span>
+                        <span class="stat-label">Detected</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="accuracy">0%</span>
+                        <span class="stat-label">Accuracy</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="sessionTime">00:00</span>
+                        <span class="stat-label">Session</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section history-section">
+                <h3>📋 Detection History</h3>
+                <div class="history-list" id="historyList">
+                    <p class="no-history">No detections yet</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section reference-section">
+            <div class="section-header">
+                <h2>📚 Quick Reference</h2>
+                <div class="reference-tabs">
+                    <button class="ref-tab active" data-tab="alphabet">Alphabet</button>
+                    <button class="ref-tab" data-tab="numbers">Numbers</button>
+                    <button class="ref-tab" data-tab="gestures">Gestures</button>
+                </div>
+            </div>
+            
+            <div class="reference-grid" id="referenceGrid">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class EnhancedSignLanguageTranslator {
+            constructor() {
+                this.videoElement = document.getElementById('videoElement');
+                this.canvasElement = document.getElementById('canvasElement');
+                this.canvasCtx = this.canvasElement.getContext('2d');
+                
+                this.isActive = false;
+                this.currentMode = 'alphabet';
+                this.gestureHistory = [];
+                this.sentence = '';
+                this.stats = {
+                    totalDetected: 0,
+                    correctDetections: 0,
+                    sessionStart: null
+                };
+                
+                this.lastDetection = null;
+                this.detectionStability = 0;
+                this.confidenceThreshold = 0.7;
+                
+                this.initializeElements();
+                this.initializeMediaPipe();
+                this.initializeGestureDatabase();
+                this.setupEventListeners();
+                this.updateReferenceGrid();
+                this.startSessionTimer();
+            }
+
+            initializeElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.statusElement = document.getElementById('cameraStatus');
+                this.detectedGestureElement = document.getElementById('detectedGesture');
+                this.gestureTypeElement = document.getElementById('gestureType');
+                this.gestureDescriptionElement = document.getElementById('gestureDescription');
+                this.confidenceFillElement = document.getElementById('confidenceFill');
+                this.confidenceValueElement = document.getElementById('confidenceValue');
+                this.historyListElement = document.getElementById('historyList');
+                this.sentenceDisplayElement = document.getElementById('sentenceDisplay');
+            }
+
+            initializeMediaPipe() {
+                this.hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+
+                this.hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.5
+                });
+
+                this.hands.onResults(this.onResults.bind(this));
+            }
+
+            initializeGestureDatabase() {
+                this.gestureDatabase = {
+                    alphabet: {
+                        'A': { 
+                            pattern: [true, false, false, false, false], 
+                            description: 'Fist with thumb up',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('A')
+                        },
+                        'B': { 
+                            pattern: [false, true, true, true, true], 
+                            description: 'Four fingers up, thumb tucked',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('B')
+                        },
+                        'C': { 
+                            pattern: [true, true, true, true, false], 
+                            description: 'Curved hand like C shape',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('C')
+                        },
+                        'D': { 
+                            pattern: [false, true, false, false, false], 
+                            description: 'Index finger up, thumb and fingers form O',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('D')
+                        },
+                        'E': { 
+                            pattern: [false, false, false, false, false], 
+                            description: 'All fingers bent down',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('E')
+                        },
+                        'F': { 
+                            pattern: [false, false, true, true, true], 
+                            description: 'Index and thumb touch, others up',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('F')
+                        },
+                        'G': { 
+                            pattern: [false, true, false, false, false], 
+                            description: 'Index finger pointing sideways',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('G')
+                        },
+                        'H': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle fingers sideways',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('H')
+                        },
+                        'I': { 
+                            pattern: [false, false, false, false, true], 
+                            description: 'Pinky finger up',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('I')
+                        },
+                        'J': { 
+                            pattern: [false, false, false, false, true], 
+                            description: 'Pinky finger traces J',
+                            confidence: 0.75,
+                            fingerPositions: this.getFingerPositions('J')
+                        },
+                        'K': { 
+                            pattern: [true, true, true, false, false], 
+                            description: 'Index and middle up, thumb between',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('K')
+                        },
+                        'L': { 
+                            pattern: [true, true, false, false, false], 
+                            description: 'Thumb and index form L',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('L')
+                        },
+                        'M': { 
+                            pattern: [true, false, false, false, false], 
+                            description: 'Three fingers over thumb',
+                            confidence: 0.75,
+                            fingerPositions: this.getFingerPositions('M')
+                        },
+                        'N': { 
+                            pattern: [true, false, false, false, false], 
+                            description: 'Two fingers over thumb',
+                            confidence: 0.75,
+                            fingerPositions: this.getFingerPositions('N')
+                        },
+                        'O': { 
+                            pattern: [true, true, true, true, true], 
+                            description: 'All fingers form O shape',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('O')
+                        },
+                        'P': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle pointing down',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('P')
+                        },
+                        'Q': { 
+                            pattern: [true, true, false, false, false], 
+                            description: 'Thumb and index pointing down',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('Q')
+                        },
+                        'R': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle crossed',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('R')
+                        },
+                        'S': { 
+                            pattern: [false, false, false, false, false], 
+                            description: 'Fist with thumb over fingers',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('S')
+                        },
+                        'T': { 
+                            pattern: [true, false, false, false, false], 
+                            description: 'Thumb between index and middle',
+                            confidence: 0.75,
+                            fingerPositions: this.getFingerPositions('T')
+                        },
+                        'U': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle together up',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('U')
+                        },
+                        'V': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle apart up',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('V')
+                        },
+                        'W': { 
+                            pattern: [false, true, true, true, false], 
+                            description: 'Three fingers up separated',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('W')
+                        },
+                        'X': { 
+                            pattern: [false, true, false, false, false], 
+                            description: 'Index finger bent like hook',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('X')
+                        },
+                        'Y': { 
+                            pattern: [true, false, false, false, true], 
+                            description: 'Thumb and pinky out',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('Y')
+                        },
+                        'Z': { 
+                            pattern: [false, true, false, false, false], 
+                            description: 'Index finger traces Z',
+                            confidence: 0.75,
+                            fingerPositions: this.getFingerPositions('Z')
+                        }
+                    },
+                    numbers: {
+                        '0': { 
+                            pattern: [true, true, true, true, true], 
+                            description: 'All fingers form O',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('0')
+                        },
+                        '1': { 
+                            pattern: [false, true, false, false, false], 
+                            description: 'Index finger up',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('1')
+                        },
+                        '2': { 
+                            pattern: [false, true, true, false, false], 
+                            description: 'Index and middle up',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('2')
+                        },
+                        '3': { 
+                            pattern: [true, true, true, false, false], 
+                            description: 'Thumb, index, middle up',
+                            confidence: 0.85,
+                            fingerPositions: this.getFingerPositions('3')
+                        },
+                        '4': { 
+                            pattern: [false, true, true, true, true], 
+                            description: 'Four fingers up',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('4')
+                        },
+                        '5': { 
+                            pattern: [true, true, true, true, true], 
+                            description: 'All five fingers up',
+                            confidence: 0.90,
+                            fingerPositions: this.getFingerPositions('5')
+                        },
+                        '6': { 
+                            pattern: [false, false, true, true, true], 
+                            description: 'Three fingers up, thumb touches pinky',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('6')
+                        },
+                        '7': { 
+                            pattern: [false, false, false, true, true], 
+                            description: 'Ring and pinky up, thumb touches middle',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('7')
+                        },
+                        '8': { 
+                            pattern: [false, false, false, false, true], 
+                            description: 'Pinky up, thumb touches ring',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('8')
+                        },
+                        '9': { 
+                            pattern: [true, false, false, false, false], 
+                            description: 'Thumb up, index touches thumb',
+                            confidence: 0.80,
+                            fingerPositions: this.getFingerPositions('9')
+                        }
+                    }
+                };
+            }
+
+            getFingerPositions(character) {
+                // Simplified finger position data for each character
+                // In a real implementation, this would contain detailed 3D coordinates
+                const positions = {
+                    'A': { thumb: 'extended', index: 'closed', middle: 'closed', ring: 'closed', pinky: 'closed' },
+                    'B': { thumb: 'tucked', index: 'extended', middle: 'extended', ring: 'extended', pinky: 'extended' },
+                    'C': { thumb: 'curved', index: 'curved', middle: 'curved', ring: 'curved', pinky: 'curved' },
+                    'D': { thumb: 'touching', index: 'extended', middle: 'curved', ring: 'curved', pinky: 'curved' },
+                    'E': { thumb: 'tucked', index: 'bent', middle: 'bent', ring: 'bent', pinky: 'bent' }
+                };
+                return positions[character] || {};
+            }
+
+            setupEventListeners() {
+                this.startBtn.addEventListener('click', this.startCamera.bind(this));
+                this.stopBtn.addEventListener('click', this.stopCamera.bind(this));
+                
+                // Mode selection
+                document.getElementById('alphabetMode').addEventListener('click', () => this.setMode('alphabet'));
+                document.getElementById('numberMode').addEventListener('click', () => this.setMode('numbers'));
+                document.getElementById('allMode').addEventListener('click', () => this.setMode('all'));
+                
+                // Sentence builder controls
+                document.getElementById('addSpaceBtn').addEventListener('click', () => this.addToSentence(' '));
+                document.getElementById('deleteLastBtn').addEventListener('click', () => this.deleteLastCharacter());
+                document.getElementById('clearSentenceBtn').addEventListener('click', () => this.clearSentence());
+                document.getElementById('speakBtn').addEventListener('click', () => this.speakSentence());
+                
+                // Reference tabs
+                document.querySelectorAll('.ref-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        document.querySelectorAll('.ref-tab').forEach(t => t.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.updateReferenceGrid(e.target.dataset.tab);
+                    });
+                });
+            }
+
+            setMode(mode) {
+                this.currentMode = mode;
+                document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById(mode + 'Mode').classList.add('active');
+                this.updateStatus(`Mode: ${mode.toUpperCase()}`, true);
+            }
+
+            async startCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 640, height: 480, facingMode: 'user' }
+                    });
+                    
+                    this.videoElement.srcObject = stream;
+                    this.isActive = true;
+                    this.stats.sessionStart = Date.now();
+                    
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    
+                    this.updateStatus('Camera Active - Ready to detect!', true);
+                    
+                    this.camera = new Camera(this.videoElement, {
+                        onFrame: async () => {
+                            if (this.isActive) {
+                                await this.hands.send({ image: this.videoElement });
+                            }
+                        },
+                        width: 640,
+                        height: 480
+                    });
+                    
+                    this.camera.start();
+                    
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    this.updateStatus('Camera access denied', false);
+                    alert('Please allow camera access to use the translator.');
+                }
+            }
+
+            stopCamera() {
+                if (this.videoElement.srcObject) {
+                    const tracks = this.videoElement.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                }
+                
+                this.isActive = false;
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                
+                this.updateStatus('Camera stopped', false);
+                this.resetDetectionDisplay();
+                this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+            }
+
+            onResults(results) {
+                if (!this.isActive) return;
+
+                this.canvasElement.width = this.videoElement.videoWidth;
+                this.canvasElement.height = this.videoElement.videoHeight;
+                this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const landmarks = results.multiHandLandmarks[0];
+                    this.drawHandLandmarks(landmarks);
+                    
+                    const gesture = this.recognizeGesture(landmarks);
+                    this.processGestureDetection(gesture);
+                } else {
+                    this.processGestureDetection(null);
+                }
+            }
+
+            drawHandLandmarks(landmarks) {
+                // Draw hand skeleton
+                this.canvasCtx.strokeStyle = '#00ff88';
+                this.canvasCtx.lineWidth = 3;
+                
+                const connections = [
+                    [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
+                    [0, 5], [5, 6], [6, 7], [7, 8], // Index
+                    [0, 9], [9, 10], [10, 11], [11, 12], // Middle
+                    [0, 13], [13, 14], [14, 15], [15, 16], // Ring
+                    [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
+                    [5, 9], [9, 13], [13, 17] // Palm connections
+                ];
+
+                // Draw connections
+                for (const [start, end] of connections) {
+                    const startPoint = landmarks[start];
+                    const endPoint = landmarks[end];
+                    
+                    this.canvasCtx.beginPath();
+                    this.canvasCtx.moveTo(
+                        startPoint.x * this.canvasElement.width,
+                        startPoint.y * this.canvasElement.height
+                    );
+                    this.canvasCtx.lineTo(
+                        endPoint.x * this.canvasElement.width,
+                        endPoint.y * this.canvasElement.height
+                    );
+                    this.canvasCtx.stroke();
+                }
+
+                // Draw landmarks
+                this.canvasCtx.fillStyle = '#ff4444';
+                for (let i = 0; i < landmarks.length; i++) {
+                    const landmark = landmarks[i];
+                    this.canvasCtx.beginPath();
+                    this.canvasCtx.arc(
+                        landmark.x * this.canvasElement.width,
+                        landmark.y * this.canvasElement.height,
+                        i === 0 ? 8 : 6, // Larger dot for wrist
+                        0, 2 * Math.PI
+                    );
+                    this.canvasCtx.fill();
+                }
+
+                // Draw fingertip labels
+                const fingerTips = [4, 8, 12, 16, 20];
+                const fingerNames = ['T', 'I', 'M', 'R', 'P'];
+                this.canvasCtx.fillStyle = '#ffffff';
+                this.canvasCtx.font = '12px Arial';
+                
+                for (let i = 0; i < fingerTips.length; i++) {
+                    const tip = landmarks[fingerTips[i]];
+                    this.canvasCtx.fillText(
+                        fingerNames[i],
+                        tip.x * this.canvasElement.width - 6,
+                        tip.y * this.canvasElement.height - 10
+                    );
+                }
+            }
+
+            recognizeGesture(landmarks) {
+                if (!landmarks || landmarks.length < 21) return null;
+
+                const fingerStates = this.analyzeFingerStates(landmarks);
+                let bestMatch = null;
+                let bestScore = 0;
+
+                // Get gesture databases based on current mode
+                let databases = [];
+                if (this.currentMode === 'alphabet') {
+                    databases = [this.gestureDatabase.alphabet];
+                } else if (this.currentMode === 'numbers') {
+                    databases = [this.gestureDatabase.numbers];
+                } else {
+                    databases = [this.gestureDatabase.alphabet, this.gestureDatabase.numbers];
+                }
+
+                // Check all relevant gestures
+                for (const database of databases) {
+                    for (const [character, gestureData] of Object.entries(database)) {
+                        const score = this.calculateGestureScore(fingerStates, gestureData, landmarks);
+                        if (score > bestScore && score > this.confidenceThreshold) {
+                            bestScore = score;
+                            bestMatch = {
+                                character: character,
+                                type: database === this.gestureDatabase.alphabet ? 'Letter' : 'Number',
+                                description: gestureData.description,
+                                confidence: score
+                            };
+                        }
+                    }
+                }
+
+                return bestMatch;
+            }
+
+            analyzeFingerStates(landmarks) {
+                const fingerTips = [4, 8, 12, 16, 20];
+                const fingerPips = [3, 6, 10, 14, 18];
+                const fingerMcps = [2, 5, 9, 13, 17];
+                
+                const states = [];
+
+                for (let i = 0; i < 5; i++) {
+                    const tip = landmarks[fingerTips[i]];
+                    const pip = landmarks[fingerPips[i]];
+                    const mcp = landmarks[fingerMcps[i]];
+
+                    // Calculate if finger is extended
+                    let isExtended;
+                    
+                    if (i === 0) { // Thumb - different logic
+                        isExtended = tip.x > pip.x; // Simplified thumb detection
+                    } else {
+                        isExtended = tip.y < pip.y && pip.y < mcp.y;
+                    }
+
+                    states.push({
+                        extended: isExtended,
+                        tipPosition: tip,
+                        pipPosition: pip,
+                        mcpPosition: mcp,
+                        angle: this.calculateFingerAngle(tip, pip, mcp)
+                    });
+                }
+
+                return states;
+            }
+
+            calculateFingerAngle(tip, pip, mcp) {
+                const v1 = { x: pip.x - mcp.x, y: pip.y - mcp.y };
+                const v2 = { x: tip.x - pip.x, y: tip.y - pip.y };
+                
+                const dot = v1.x * v2.x + v1.y * v2.y;
+                const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+                const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+                
+                const cos = dot / (mag1 * mag2);
+                return Math.acos(Math.max(-1, Math.min(1, cos))) * (180 / Math.PI);
+            }
+
+            calculateGestureScore(fingerStates, gestureData, landmarks) {
+                let score = 0;
+                const pattern = gestureData.pattern;
+                
+                // Basic pattern matching
+                for (let i = 0; i < Math.min(fingerStates.length, pattern.length); i++) {
+                    if (fingerStates[i].extended === pattern[i]) {
+                        score += 0.2; // 20% per correct finger
+                    }
+                }
+
+                // Additional scoring based on finger angles and positions
+                for (let i = 0; i < fingerStates.length; i++) {
+                    const angle = fingerStates[i].angle;
+                    if (pattern[i] && angle > 160) { // Extended finger should be straight
+                        score += 0.05;
+                    } else if (!pattern[i] && angle < 120) { // Closed finger should be bent
+                        score += 0.05;
+                    }
+                }
+
+                // Stability bonus - prefer consistent detections
+                if (this.lastDetection && this.lastDetection.character === gestureData.character) {
+                    score += 0.1;
+                }
+
+                return Math.min(score, 1.0);
+            }
+
+            processGestureDetection(gesture) {
+                if (gesture && gesture.confidence > this.confidenceThreshold) {
+                    // Stability check
+                    if (this.lastDetection && this.lastDetection.character === gesture.character) {
+                        this.detectionStability++;
+                    } else {
+                        this.detectionStability = 1;
+                    }
+
+                    if (this.detectionStability >= 3) { // Require 3 consecutive detections
+                        this.updateGestureDisplay(gesture);
+                        this.addToSentence(gesture.character);
+                        this.addToHistory(gesture);
+                        this.updateStats(gesture);
+                    }
+                    
+                    this.lastDetection = gesture;
+                } else {
+                    this.detectionStability = 0;
+                    this.updateGestureDisplay(null);
+                }
+            }
+
+            updateGestureDisplay(gesture) {
+                if (gesture) {
+                    this.detectedGestureElement.textContent = gesture.character;
+                    this.detectedGestureElement.classList.add('active');
+                    this.gestureTypeElement.textContent = `Type: ${gesture.type}`;
+                    this.gestureDescriptionElement.textContent = gesture.description;
+                    this.updateConfidence(gesture.confidence);
+                } else {
+                    this.detectedGestureElement.textContent = 'Detecting...';
+                    this.detectedGestureElement.classList.remove('active');
+                    this.gestureTypeElement.textContent = 'Type: -';
+                    this.gestureDescriptionElement.textContent = 'Show your hand clearly';
+                    this.updateConfidence(0);
+                }
+            }
+
+            updateConfidence(confidence) {
+                const percentage = Math.round(confidence * 100);
+                this.confidenceFillElement.style.width = percentage + '%';
+                this.confidenceValueElement.textContent = percentage + '%';
+            }
+
+            addToSentence(character) {
+                if (character && character !== this.sentence.slice(-1)) { // Prevent duplicate consecutive characters
+                    this.sentence += character;
+                    this.updateSentenceDisplay();
+                }
+            }
+
+            updateSentenceDisplay() {
+                const display = this.sentenceDisplayElement;
+                if (this.sentence.length > 0) {
+                    display.textContent = this.sentence;
+                    display.style.color = '#ffffff';
+                } else {
+                    display.textContent = 'Letters and numbers will appear here...';
+                    display.style.color = '#cccccc';
+                }
+            }
+
+            deleteLastCharacter() {
+                if (this.sentence.length > 0) {
+                    this.sentence = this.sentence.slice(0, -1);
+                    this.updateSentenceDisplay();
+                }
+            }
+
+            clearSentence() {
+                this.sentence = '';
+                this.updateSentenceDisplay();
+            }
+
+            speakSentence() {
+                if (this.sentence.length > 0 && 'speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(this.sentence);
+                    utterance.rate = 0.8;
+                    utterance.pitch = 1;
+                    speechSynthesis.speak(utterance);
+                }
+            }
+
+            addToHistory(gesture) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.gestureHistory.unshift({
+                    character: gesture.character,
+                    type: gesture.type,
+                    confidence: Math.round(gesture.confidence * 100),
+                    timestamp: timestamp
+                });
+
+                if (this.gestureHistory.length > 20) {
+                    this.gestureHistory.pop();
+                }
+
+                this.updateHistoryDisplay();
+            }
+
+            updateHistoryDisplay() {
+                const historyElement = this.historyListElement;
+                
+                if (this.gestureHistory.length === 0) {
+                    historyElement.innerHTML = '<p class="no-history">No detections yet</p>';
+                    return;
+                }
+
+                historyElement.innerHTML = this.gestureHistory.map(item => `
+                    <div class="history-item">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <strong style="font-size: 1.2rem; color: #ffd700;">${item.character}</strong>
+                            <span>${item.type}</span>
+                        </div>
+                        <div style="text-align: right; font-size: 0.8rem;">
+                            <div>${item.confidence}%</div>
+                            <div>${item.timestamp}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            updateStats(gesture) {
+                this.stats.totalDetected++;
+                if (gesture.confidence > 0.8) {
+                    this.stats.correctDetections++;
+                }
+
+                const accuracy = Math.round((this.stats.correctDetections / this.stats.totalDetected) * 100);
+                
+                document.getElementById('totalDetected').textContent = this.stats.totalDetected;
+                document.getElementById('accuracy').textContent = accuracy + '%';
+            }
+
+            startSessionTimer() {
+                setInterval(() => {
+                    if (this.stats.sessionStart) {
+                        const elapsed = Date.now() - this.stats.sessionStart;
+                        const minutes = Math.floor(elapsed / 60000);
+                        const seconds = Math.floor((elapsed % 60000) / 1000);
+                        document.getElementById('sessionTime').textContent = 
+                            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                }, 1000);
+            }
+
+            updateReferenceGrid(tab = 'alphabet') {
+                const grid = document.getElementById('referenceGrid');
+                let items = [];
+
+                if (tab === 'alphabet') {
+                    items = Object.keys(this.gestureDatabase.alphabet).map(char => ({
+                        char: char,
+                        desc: 'Letter'
+                    }));
+                } else if (tab === 'numbers') {
+                    items = Object.keys(this.gestureDatabase.numbers).map(char => ({
+                        char: char,
+                        desc: 'Number'
+                    }));
+                } else if (tab === 'gestures') {
+                    items = [
+                        { char: '👍', desc: 'Thumbs Up' },
+                        { char: '✌️', desc: 'Peace' },
+                        { char: '✋', desc: 'Stop/Hello' },
+                        { char: '👌', desc: 'OK' },
+                        { char: '🤘', desc: 'Rock On' }
+                    ];
+                }
+
+                grid.innerHTML = items.map(item => `
+                    <div class="reference-item">
+                        <div class="reference-char">${item.char}</div>
+                        <div class="reference-desc">${item.desc}</div>
+                    </div>
+                `).join('');
+            }
+
+            resetDetectionDisplay() {
+                this.detectedGestureElement.textContent = 'Camera stopped';
+                this.gestureTypeElement.textContent = 'Type: -';
+                this.gestureDescriptionElement.textContent = 'Start camera to begin detection';
+                this.updateConfidence(0);
+            }
+
+            updateStatus(message, isActive) {
+                this.statusElement.textContent = message;
+                this.statusElement.className = `status ${isActive ? 'status-active' : 'status-inactive'}`;
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new EnhancedSignLanguageTranslator();
+        });
+    </script>
+</body>
+</html>
